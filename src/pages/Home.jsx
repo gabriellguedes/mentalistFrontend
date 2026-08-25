@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/mentalistClient";
 import { getLevel } from "@/lib/levels";
-import { startOfWeek, isSameWeek } from "date-fns";
+import { startOfWeek } from "date-fns";
 import { Timer, Library, Bot, Users, ArrowRight, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -35,38 +35,56 @@ export default function Home() {
   const { data: profile } = useQuery({
     queryKey: ["home-profile"],
     queryFn: async () => {
-      const me = await base44.auth.me();
-      const sessions = await base44.entities.StudySession.filter(
-        { created_by_id: me.id, status: "completed" },
-        "-created_date",
-        200,
+      const meRes = await api.get("/users/me/");
+      const me = meRes.data;
+
+      const sessionsRes = await api.get("/entities/StudySession/");
+      const allSessions = Array.isArray(sessionsRes.data)
+        ? sessionsRes.data
+        : sessionsRes.data.results || [];
+
+      const sessions = allSessions.filter(
+        (s) =>
+          (String(s.created_by) === String(me.id) ||
+            String(s.created_by_id) === String(me.id) ||
+            String(s.user) === String(me.id)) &&
+          s.status === "completed",
       );
+
       return { me, sessions };
     },
   });
+
   const { data: techniques = [] } = useQuery({
     queryKey: ["techniques"],
-    queryFn: () => base44.entities.Technique.list("created_date", 100),
+    queryFn: async () => {
+      const res = await api.get("/entities/Technique/");
+      return Array.isArray(res.data) ? res.data : res.data.results || [];
+    },
   });
+
   const { data: focusing = [] } = useQuery({
     queryKey: ["home-focusing"],
-    queryFn: () =>
-      base44.entities.RoomParticipant.filter(
-        { is_focusing: true },
-        "-last_ping",
-        12,
-      ),
+    queryFn: async () => {
+      const res = await api.get("/entities/RoomParticipant/");
+      const all = Array.isArray(res.data) ? res.data : res.data.results || [];
+      return all.filter((p) => p.is_focusing);
+    },
     refetchInterval: 15000,
   });
 
   const me = profile?.me;
   const total = me?.total_focus_minutes || 0;
   const lvl = getLevel(total);
+
   const weekMin = useMemo(() => {
     const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
     return (profile?.sessions || [])
-      .filter((s) => new Date(s.created_date) >= ws)
-      .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+      .filter((s) => {
+        const sessionDate = new Date(s.created_at || s.created_date);
+        return sessionDate >= ws;
+      })
+      .reduce((sum, s) => sum + Number(s.duration_minutes || 0), 0);
   }, [profile]);
 
   const recommended = useMemo(() => {
@@ -75,7 +93,12 @@ export default function Home() {
     return techniques[day % techniques.length];
   }, [techniques]);
 
-  const firstName = (me?.full_name || me?.email || "Estudante").split(" ")[0];
+  const firstName = (
+    me?.full_name ||
+    me?.username ||
+    me?.email ||
+    "Estudante"
+  ).split(" ")[0];
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
@@ -166,21 +189,24 @@ export default function Home() {
                 Ninguém em foco no momento.
               </p>
             )}
-            {focusing.slice(0, 8).map((p) => (
-              <div key={p.id} className="flex flex-col items-center gap-1">
-                <div className="relative">
-                  <Avatar className="h-9 w-9 rounded-full border border-border">
-                    <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
-                      {initials(p.user_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-card bg-emerald" />
+            {focusing.slice(0, 8).map((p) => {
+              const name = p.user_name || p.username || "—";
+              return (
+                <div key={p.id} className="flex flex-col items-center gap-1">
+                  <div className="relative">
+                    <Avatar className="h-9 w-9 rounded-full border border-border">
+                      <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
+                        {initials(name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-card bg-emerald" />
+                  </div>
+                  <p className="max-w-[64px] truncate text-[10px] text-muted-foreground">
+                    {name.split(" ")[0]}
+                  </p>
                 </div>
-                <p className="max-w-[64px] truncate text-[10px] text-muted-foreground">
-                  {p.user_name?.split(" ")[0] || "—"}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

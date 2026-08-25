@@ -73,10 +73,23 @@ export default function Settings() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data: me } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+  const { data: me, error } = useQuery({
+    queryKey: ["user"],
+    queryFn: async () => {
+      const res = await api.get("/users/me/");
+      return res.data;
+    },
+    retry: false,
   });
+
+  // Opção 2: Redireciona para o login caso ocorra 401 ou 403 (token expirado ou ausente)
+  useEffect(() => {
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      navigate("/login");
+    }
+  }, [error, navigate]);
 
   const [s, setS] = useState(() => mergeSettings(me?.settings));
   const [avatar, setAvatar] = useState(() => me?.avatar_url || "");
@@ -95,13 +108,13 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
-      await base44.auth.updateMe({ settings: s, avatar_url: avatar });
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await api.patch("/users/me/", { settings: s, avatar_url: avatar });
+      await qc.invalidateQueries({ queryKey: ["user"] });
       toast({ title: "Configurações salvas" });
     } catch (e) {
       toast({
         title: "Erro ao salvar",
-        description: e.message,
+        description: e.response?.data?.detail || e.message,
         variant: "destructive",
       });
     } finally {
@@ -110,40 +123,60 @@ export default function Settings() {
   };
 
   const exportAnki = async () => {
-    const techs = await base44.entities.Technique.list("created_date", 200);
-    const rows = ["front\tback\ttags"];
-    techs.forEach((t) => {
-      const back = (t.what_it_is || "").replace(/\t/g, " ").replace(/\n/g, " ");
-      rows.push(`${t.title}\t${back}\tmentalista::tecnica`);
-    });
-    download("mentalista-tecnicas-anki.txt", rows.join("\n"));
-    toast({
-      title: "Cartões exportados",
-      description: `${techs.length} técnicas no formato Anki`,
-    });
+    try {
+      const res = await api.get("/techniques/");
+      const techs = Array.isArray(res.data) ? res.data : res.data.results || [];
+
+      const rows = ["front\tback\ttags"];
+      techs.forEach((t) => {
+        const back = (t.what_it_is || "")
+          .replace(/\t/g, " ")
+          .replace(/\n/g, " ");
+        rows.push(`${t.title}\t${back}\tmentalista::tecnica`);
+      });
+      download("mentalista-tecnicas-anki.txt", rows.join("\n"));
+      toast({
+        title: "Cartões exportados",
+        description: `${techs.length} técnicas no formato Anki`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao exportar",
+        description: e.response?.data?.detail || e.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const backup = async () => {
-    const sessions = await base44.entities.StudySession.filter(
-      { created_by_id: me.id },
-      "-created_date",
-      500,
-    );
-    const payload = JSON.stringify(
-      {
-        user: me.email,
-        exported_at: new Date().toISOString(),
-        total_focus_minutes: me.total_focus_minutes,
-        sessions,
-      },
-      null,
-      2,
-    );
-    download("mentalista-backup.json", payload, "application/json");
-    toast({
-      title: "Backup gerado",
-      description: `${sessions.length} sessões exportadas`,
-    });
+    try {
+      const res = await api.get("/study-sessions/");
+      const sessions = Array.isArray(res.data)
+        ? res.data
+        : res.data.results || [];
+
+      const payload = JSON.stringify(
+        {
+          user: me?.email,
+          exported_at: new Date().toISOString(),
+          total_focus_minutes: me?.total_focus_minutes || 0,
+          sessions,
+        },
+        null,
+        2,
+      );
+      download("mentalista-backup.json", payload, "application/json");
+      toast({
+        title: "Backup gerado",
+        description: `${sessions.length} sessões exportadas`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao gerar backup",
+        description: e.response?.data?.detail || e.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const wipe = async () => {
@@ -154,20 +187,25 @@ export default function Settings() {
     )
       return;
     try {
-      await base44.entities.StudySession.deleteMany({ created_by_id: me.id });
-      await base44.auth.updateMe({ total_focus_minutes: 0 });
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await api.delete("/study-sessions/clear_all/");
+      await api.patch("/users/me/", { total_focus_minutes: 0 });
+      await qc.invalidateQueries({ queryKey: ["user"] });
       toast({ title: "Dados de estudo apagados" });
     } catch (e) {
       toast({
         title: "Erro ao apagar",
-        description: e.message,
+        description: e.response?.data?.detail || e.message,
         variant: "destructive",
       });
     }
   };
 
-  const logout = () => base44.auth.logout();
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    qc.clear();
+    navigate("/login");
+  };
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-8 sm:px-8">
@@ -438,7 +476,7 @@ export default function Settings() {
             <Button
               size="sm"
               variant="outline"
-              onClick={logout}
+              onClick={handleLogout}
               className="h-8 gap-1.5 text-[12px]"
             >
               <LogOut className="h-3.5 w-3.5" /> Sair

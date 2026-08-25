@@ -9,7 +9,9 @@ import AuthLayout from "@/components/AuthLayout";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
-  const resetToken = searchParams.get("token");
+  const resetToken =
+    searchParams.get("token") || searchParams.get("token_confirm");
+  const uid = searchParams.get("uid");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,16 +21,27 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
+
     setLoading(true);
     try {
-      await base44.auth.resetPassword({ resetToken, newPassword });
+      await api.post("/users/reset_password_confirm/", {
+        uid: uid || "",
+        token: resetToken,
+        new_password: newPassword,
+        re_new_password: confirmPassword,
+      });
       window.location.href = "/login";
     } catch (err) {
-      setError(err.message || "Failed to reset password");
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.non_field_errors?.[0] ||
+        "Failed to reset password";
+      setError(msg);
     } finally {
       setLoading(false);
     }

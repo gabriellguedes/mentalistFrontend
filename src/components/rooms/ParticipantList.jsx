@@ -3,25 +3,48 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const initials = (name) => (name || "?").trim().slice(0, 2).toUpperCase();
 
-export default function ParticipantList({ participants }) {
-  const ranked = [...participants].sort(
-    (a, b) => (b.week_minutes || 0) - (a.week_minutes || 0),
+export default function ParticipantList({ participants = [] }) {
+  // Tratamento de segurança para garantir que participants seja um array
+  const safeParticipants = Array.isArray(participants) ? participants : [];
+
+  // Mapeamento tolerante aos nomes de campos vindos da API
+  const normalizedParticipants = safeParticipants.map((p) => {
+    const name = p.user_name || p.username || p.full_name || "Estudante";
+    const minutes =
+      p.week_minutes ?? p.total_focus_minutes ?? p.focus_minutes ?? 0;
+    const isFocusing = p.is_focusing ?? p.is_active ?? false;
+    const statusText = p.status_text || p.status || "";
+
+    return {
+      ...p,
+      id: p.id || Math.random().toString(),
+      display_name: name,
+      minutes: Number(minutes),
+      is_focusing: Boolean(isFocusing),
+      status_text: statusText,
+    };
+  });
+
+  // Ordenação para o ranking semanal
+  const ranked = [...normalizedParticipants].sort(
+    (a, b) => b.minutes - a.minutes,
   );
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Presença · {participants.length}
+          Presença · {normalizedParticipants.length}
         </p>
         <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
-          {participants.map((p) => {
+          {normalizedParticipants.map((p) => {
             const lost = p.status_text === "Perdeu o foco";
             return (
               <div key={p.id} className="flex flex-col items-center gap-1.5">
                 <div className="relative">
                   <Avatar className="h-11 w-11 rounded-full border border-border">
                     <AvatarFallback className="rounded-full bg-secondary text-[11px] text-muted-foreground">
-                      {initials(p.user_name)}
+                      {initials(p.display_name)}
                     </AvatarFallback>
                   </Avatar>
                   <span
@@ -35,7 +58,7 @@ export default function ParticipantList({ participants }) {
                   />
                 </div>
                 <p className="max-w-full truncate text-[10.5px] text-muted-foreground">
-                  {p.user_name || "—"}
+                  {p.display_name}
                 </p>
                 {lost && (
                   <p className="text-[9px] text-amber-500/80">foco perdido</p>
@@ -43,7 +66,7 @@ export default function ParticipantList({ participants }) {
               </div>
             );
           })}
-          {participants.length === 0 && (
+          {normalizedParticipants.length === 0 && (
             <p className="col-span-full text-[12px] text-muted-foreground">
               Ninguém na sala ainda.
             </p>
@@ -71,10 +94,10 @@ export default function ParticipantList({ participants }) {
               >
                 <td className="py-2 pr-2 text-muted-foreground">{i + 1}</td>
                 <td className="py-2 pr-2 font-sans text-foreground/90">
-                  {p.user_name || "Estudante"}
+                  {p.display_name}
                 </td>
                 <td className="py-2 text-right tabular-nums text-muted-foreground">
-                  {Math.round(p.week_minutes || 0)}m
+                  {Math.round(p.minutes)}m
                 </td>
               </tr>
             ))}

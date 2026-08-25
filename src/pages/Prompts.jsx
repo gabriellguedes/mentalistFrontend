@@ -6,15 +6,25 @@ import PromptCard from "@/components/prompts/PromptCard";
 
 export default function Prompts() {
   const [goal, setGoal] = useState("Todos");
+
   const { data: prompts = [], isLoading } = useQuery({
     queryKey: ["prompts"],
-    queryFn: () => base44.entities.AiPrompt.list("created_date", 100),
+    queryFn: async () => {
+      const response = await api.get("/entities/AIPrompt/");
+      return Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
+    },
   });
 
   const goals = useMemo(
-    () => ["Todos", ...new Set(prompts.map((p) => p.category_goal))],
+    () => [
+      "Todos",
+      ...new Set(prompts.map((p) => p.category_goal).filter(Boolean)),
+    ],
     [prompts],
   );
+
   const filtered = prompts.filter(
     (p) => goal === "Todos" || p.category_goal === goal,
   );
@@ -32,7 +42,11 @@ export default function Prompts() {
           <button
             key={g}
             onClick={() => setGoal(g)}
-            className={`text-[12px] transition-colors ${goal === g ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={`text-[12px] transition-colors ${
+              goal === g
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
             {g}
           </button>

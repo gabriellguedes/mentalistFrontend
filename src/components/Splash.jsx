@@ -23,7 +23,7 @@ export default function Splash({ onDone }) {
     >
       <BrandLogo size={104} />
       <p className="mt-6 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-        O Estudante Mentalista
+        Estudante Mentalista
       </p>
     </div>
   );

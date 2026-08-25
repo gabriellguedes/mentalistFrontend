@@ -9,19 +9,29 @@ import { Search } from "lucide-react";
 export default function Techniques() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Todas");
+
   const { data: techniques = [], isLoading } = useQuery({
     queryKey: ["techniques"],
-    queryFn: () => base44.entities.Technique.list("created_date", 100),
+    queryFn: async () => {
+      const response = await api.get("/entities/Technique/");
+      return Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
+    },
   });
 
   const categories = useMemo(
-    () => ["Todas", ...new Set(techniques.map((t) => t.category))],
+    () => [
+      "Todas",
+      ...new Set(techniques.map((t) => t.category).filter(Boolean)),
+    ],
     [techniques],
   );
+
   const filtered = techniques.filter(
     (t) =>
       (cat === "Todas" || t.category === cat) &&
-      (t.title + t.what_it_is + t.how_it_works)
+      ((t.title || "") + (t.what_it_is || "") + (t.how_it_works || ""))
         .toLowerCase()
         .includes(q.toLowerCase()),
   );

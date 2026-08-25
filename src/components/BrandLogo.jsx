@@ -6,7 +6,7 @@ const SRC =
 export default function BrandLogo({
   size = 40,
   className = "",
-  alt = "O Estudante Mentalista",
+  alt = "Estudante Mentalista",
 }) {
   return (
     <img

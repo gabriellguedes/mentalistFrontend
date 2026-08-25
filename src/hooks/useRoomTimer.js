@@ -12,7 +12,12 @@ function phaseMinutes(modeId, phase) {
 }
 
 export default function useRoomTimer({ room, me, onSessionSaved }) {
-  const isHost = !!(me && room && me.id === room.host_user_id);
+  const isHost = !!(
+    me &&
+    room &&
+    (String(me.id) === String(room.host_user_id) ||
+      String(me.id) === String(room.created_by))
+  );
   const [modeId, setModeId] = useState("pomodoro");
   const [phase, setPhase] = useState("focus");
   const [running, setRunning] = useState(false);
@@ -28,29 +33,37 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     async (minutes, status) => {
       const mins = Math.round(minutes * 10) / 10;
       if (mins < 0.2 || !room) return;
-      await base44.entities.StudySession.create({
-        timer_type: modeId,
-        duration_minutes: mins,
-        status,
-        room_id: room.id,
-      });
-      const meObj = await base44.auth.me();
-      await base44.auth.updateMe({
-        total_focus_minutes: (meObj.total_focus_minutes || 0) + mins,
-      });
-      onSessionSaved?.();
+      try {
+        await api.post("/entities/StudySession/", {
+          timer_type: modeId,
+          duration_minutes: mins,
+          status,
+          room_id: String(room.id),
+        });
+
+        // Atualiza o total de minutos acumulados do usuário
+        const currentTotal = me?.total_focus_minutes || 0;
+        await api.patch("/users/me/", {
+          total_focus_minutes: currentTotal + mins,
+        });
+
+        onSessionSaved?.();
+      } catch (err) {
+        console.error("Erro ao salvar sessão de estudo:", err);
+      }
     },
-    [modeId, room, onSessionSaved],
+    [modeId, room, me, onSessionSaved],
   );
 
   const completePhase = useCallback(
     (completed) => {
       const wasFocus = phase === "focus";
-      if (wasFocus && elapsedRef.current > 10)
+      if (wasFocus && elapsedRef.current > 10) {
         saveSession(
           elapsedRef.current / 60,
           completed ? "completed" : "interrupted",
         );
+      }
       elapsedRef.current = 0;
       const m = getMode(modeId);
       if (m.kind !== "cycle") {
@@ -68,7 +81,7 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     [phase, cycles, modeId, saveSession],
   );
 
-  // host tick
+  // Tick do Host
   useEffect(() => {
     if (!isHost || !running) return;
     const id = setInterval(() => {
@@ -85,32 +98,35 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     return () => clearInterval(id);
   }, [isHost, running, phase, completePhase]);
 
-  // host broadcast to room
+  // Transmissão de estado pelo Host
   useEffect(() => {
     if (!isHost || !room) return;
     const broadcast = async () => {
       const s = stateRef.current;
-      const state = { ...s, hostId: me.id, ts: Date.now() };
+      const state = { ...s, hostId: me?.id, ts: Date.now() };
       if (s.running) state.endsAt = Date.now() + s.secondsLeft * 1000;
       try {
-        await base44.entities.StudyRoom.update(room.id, {
+        await api.patch(`/entities/StudyRoom/${room.id}/`, {
           current_timer_status: JSON.stringify(state),
         });
-      } catch {}
+      } catch (err) {
+        console.error("Erro ao transmitir status da sala:", err);
+      }
     };
     broadcast();
     const id = setInterval(broadcast, 3000);
     return () => clearInterval(id);
   }, [isHost, room, me]);
 
-  // participant poll
+  // Polling dos participantes para buscar o timer do host
   const endsAtRef = useRef(null);
   useEffect(() => {
     if (isHost || !room) return;
     let cancelled = false;
     const poll = async () => {
       try {
-        const r = await base44.entities.StudyRoom.get(room.id);
+        const res = await api.get(`/entities/StudyRoom/${room.id}/`);
+        const r = res.data;
         if (cancelled) return;
         let st = null;
         try {
@@ -137,7 +153,9 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
             st.secondsLeft ?? phaseMinutes(st.modeId, st.phase) * 60,
           );
         }
-      } catch {}
+      } catch (err) {
+        console.error("Erro no polling da sala:", err);
+      }
     };
     poll();
     const id = setInterval(poll, 3000);
@@ -147,7 +165,7 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     };
   }, [isHost, room]);
 
-  // participant local display tick
+  // Atualização visual local para participantes
   useEffect(() => {
     if (isHost) return;
     const id = setInterval(() => {

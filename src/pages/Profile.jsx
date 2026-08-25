@@ -8,12 +8,18 @@ export default function Profile() {
   const { data } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
-      const me = await base44.auth.me();
-      const sessions = await base44.entities.StudySession.filter(
-        { created_by_id: me.id },
-        "-created_date",
-        500,
+      const meRes = await api.get("/users/me/");
+      const me = meRes.data;
+
+      const sessionsRes = await api.get("/entities/StudySession/");
+      const rawSessions = Array.isArray(sessionsRes.data)
+        ? sessionsRes.data
+        : sessionsRes.data.results || [];
+
+      const sessions = rawSessions.filter(
+        (s) => s.created_by_id === me.id || s.created_by === me.id,
       );
+
       return { me, sessions };
     },
   });

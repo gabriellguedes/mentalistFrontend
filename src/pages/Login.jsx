@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import api from "@/api/mentalistClient";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext"; // Importação do AuthContext
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { login } = useAuth(); // Hook de autenticação
+  const navigate = useNavigate();
   const returnTo = safeReturnTo();
 
   const handleSubmit = async (e) => {
@@ -34,8 +37,10 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = returnTo;
+      // Chama a função de login com a API JWT do Django
+      await login(email, password);
+
+      navigate(returnTo || "/");
     } catch (err) {
       setError(err.message || "E-mail ou senha inválidos");
     } finally {
@@ -43,8 +48,14 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => base44.auth.loginWithProvider("google", returnTo);
-  const handleApple = () => base44.auth.loginWithProvider("apple", returnTo);
+  // Funções temporárias caso ainda não tenha configurado OAuth Social no Django
+  const handleGoogle = () => {
+    alert("Login social com Google será implementado via Django Allauth.");
+  };
+
+  const handleApple = () => {
+    alert("Login social com Apple será implementado via Django Allauth.");
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">

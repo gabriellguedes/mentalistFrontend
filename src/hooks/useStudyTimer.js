@@ -72,18 +72,29 @@ export default function useStudyTimer({
     async (minutes, status) => {
       const mins = Math.round(minutes * 10) / 10;
       if (mins < 0.2) return;
-      await base44.entities.StudySession.create({
-        timer_type: modeId,
-        duration_minutes: mins,
-        status,
-        technique_used: technique || undefined,
-        room_id: roomId || undefined,
-      });
-      const me = await base44.auth.me();
-      await base44.auth.updateMe({
-        total_focus_minutes: (me.total_focus_minutes || 0) + mins,
-      });
-      onSessionSaved?.();
+
+      try {
+        // Registra a nova sessão de estudo
+        await api.post("/entities/StudySession/", {
+          timer_type: modeId,
+          duration_minutes: mins,
+          status,
+          technique_used: technique || null,
+          room_id: roomId || null,
+        });
+
+        // Busca o perfil do usuário logado e atualiza total_focus_minutes
+        const meRes = await api.get("/users/me/");
+        const currentTotal = meRes.data.total_focus_minutes || 0;
+
+        await api.patch("/users/me/", {
+          total_focus_minutes: currentTotal + mins,
+        });
+
+        onSessionSaved?.();
+      } catch (err) {
+        console.error("Erro ao salvar sessão de estudo:", err);
+      }
     },
     [modeId, technique, roomId, onSessionSaved],
   );

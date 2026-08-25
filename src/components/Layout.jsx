@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import {
   Home as HomeIcon,
   Timer,
@@ -11,8 +12,8 @@ import {
   Menu,
   X,
   Settings as SettingsIcon,
+  LogOut,
 } from "lucide-react";
-import api from "@/api/mentalistClient";
 import BrandLogo from "@/components/BrandLogo";
 
 const NAV = [
@@ -28,6 +29,13 @@ const NAV = [
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   const nav = (
     <nav className="flex flex-col gap-0.5 px-2">
@@ -59,7 +67,7 @@ export default function Layout() {
           <BrandLogo size={32} />
           <div>
             <p className="text-[13px] font-medium tracking-tight text-foreground">
-              O Estudante Mentalista
+              Estudante Mentalista
             </p>
             <p className="text-[11px] text-muted-foreground">
               Memorização acelerada
@@ -69,10 +77,11 @@ export default function Layout() {
         <div className="mt-1 flex-1">{nav}</div>
         <div className="border-t border-border p-2">
           <button
-            onClick={() => base44.auth.logout()}
-            className="w-full rounded-md px-2.5 py-2 text-left text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           >
-            Sair
+            <LogOut className="h-[15px] w-[15px] shrink-0" />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
@@ -90,13 +99,20 @@ export default function Layout() {
             )}
           </button>
           <BrandLogo size={28} />
-          <span className="text-[13px] font-medium">
-            O Estudante Mentalista
-          </span>
+          <span className="text-[13px] font-medium">Estudante Mentalista</span>
         </header>
         {mobileOpen && (
           <div className="border-b border-border bg-background py-2 md:hidden">
             {nav}
+            <div className="mt-2 border-t border-border px-2 pt-2">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+              >
+                <LogOut className="h-[15px] w-[15px] shrink-0" />
+                <span>Sair</span>
+              </button>
+            </div>
           </div>
         )}
         <main className="min-w-0 flex-1">

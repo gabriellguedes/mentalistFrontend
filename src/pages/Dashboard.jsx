@@ -31,12 +31,19 @@ export default function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const me = await base44.auth.me();
-      const sessions = await base44.entities.StudySession.filter(
-        { created_by_id: me.id },
-        "-created_date",
-        500,
+      const meRes = await api.get("/users/me/");
+      const me = meRes.data;
+
+      const sessionsRes = await api.get("/entities/StudySession/");
+      const rawSessions = Array.isArray(sessionsRes.data)
+        ? sessionsRes.data
+        : sessionsRes.data.results || [];
+
+      // Filtra sessões pertencentes ao usuário logado
+      const sessions = rawSessions.filter(
+        (s) => s.created_by_id === me.id || s.created_by === me.id,
       );
+
       return { me, sessions };
     },
   });
@@ -49,7 +56,7 @@ export default function Dashboard() {
         .filter(
           (s) =>
             s.status === "completed" &&
-            isSameDay(new Date(s.created_date), day),
+            isSameDay(new Date(s.created_date || s.created_at), day),
         )
         .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
       return {
@@ -63,7 +70,7 @@ export default function Dashboard() {
   const interrupted = sessions.filter((s) => s.status === "interrupted");
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekMin = completed
-    .filter((s) => new Date(s.created_date) >= weekStart)
+    .filter((s) => new Date(s.created_date || s.created_at) >= weekStart)
     .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
   const total = data?.me?.total_focus_minutes || 0;
   const lvl = getLevel(total);
@@ -151,7 +158,10 @@ export default function Dashboard() {
               <div>
                 <p className="text-foreground/90">{s.timer_type}</p>
                 <p className="font-mono-timer text-[10.5px] text-muted-foreground">
-                  {format(new Date(s.created_date), "dd/MM HH:mm")}
+                  {format(
+                    new Date(s.created_date || s.created_at),
+                    "dd/MM HH:mm",
+                  )}
                   {s.technique_used ? ` · ${s.technique_used}` : ""}
                 </p>
               </div>

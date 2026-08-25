@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 export default function Timers() {
   const [technique, setTechnique] = useState("");
   const t = useStudyTimer({ technique });
+
   const label =
     t.mode.kind === "stopwatch"
       ? "Decorrido"

@@ -10,8 +10,8 @@ export default function PageNotFound({}) {
     queryKey: ["user"],
     queryFn: async () => {
       try {
-        const user = await base44.auth.me();
-        return { user, isAuthenticated: true };
+        const response = await api.get("/users/me/");
+        return { user: response.data, isAuthenticated: true };
       } catch (error) {
         return { user: null, isAuthenticated: false };
       }
@@ -42,8 +42,8 @@ export default function PageNotFound({}) {
 
           {/* Admin Note */}
           {isFetched &&
-            authData.isAuthenticated &&
-            authData.user?.role === "admin" && (
+            authData?.isAuthenticated &&
+            (authData.user?.role === "admin" || authData.user?.is_staff) && (
               <div className="mt-8 p-4 bg-slate-100 rounded-lg border border-slate-200">
                 <div className="flex items-start space-x-3">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center mt-0.5">

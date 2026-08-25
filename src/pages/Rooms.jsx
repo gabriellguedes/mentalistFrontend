@@ -14,32 +14,51 @@ export default function Rooms() {
   const [name, setName] = useState("");
   const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
+
   const { data: rooms = [], refetch } = useQuery({
     queryKey: ["rooms"],
-    queryFn: () => base44.entities.StudyRoom.list("-created_date", 30),
+    queryFn: async () => {
+      const res = await api.get("/entities/StudyRoom/");
+      return Array.isArray(res.data) ? res.data : res.data.results || [];
+    },
   });
 
   const create = async () => {
     if (!name.trim()) return;
-    const me = await base44.auth.me();
-    const room = await base44.entities.StudyRoom.create({
-      name: name.trim(),
-      invite_code: code(),
-      host_user_id: me.id,
-    });
-    setName("");
-    refetch();
-    nav(`/salas/${room.invite_code}`);
+    try {
+      const meRes = await api.get("/users/me/");
+      const roomRes = await api.post("/entities/StudyRoom/", {
+        name: name.trim(),
+        invite_code: code(),
+        host_user_id: meRes.data.id.toString(),
+      });
+      setName("");
+      refetch();
+      nav(`/salas/${roomRes.data.invite_code}`);
+    } catch (err) {
+      console.error("Erro ao criar sala:", err);
+    }
   };
 
   const join = async () => {
     setError("");
-    const found = await base44.entities.StudyRoom.filter({
-      invite_code: invite.trim().toUpperCase(),
-    });
-    if (!found.length)
-      return setError("Nenhuma sala encontrada com esse código.");
-    nav(`/salas/${found[0].invite_code}`);
+    const searchCode = invite.trim().toUpperCase();
+    if (!searchCode) return;
+
+    try {
+      const res = await api.get("/entities/StudyRoom/");
+      const allRooms = Array.isArray(res.data)
+        ? res.data
+        : res.data.results || [];
+      const found = allRooms.find((r) => r.invite_code === searchCode);
+
+      if (!found) {
+        return setError("Nenhuma sala encontrada com esse código.");
+      }
+      nav(`/salas/${found.invite_code}`);
+    } catch (err) {
+      setError("Erro ao pesquisar a sala.");
+    }
   };
 
   return (

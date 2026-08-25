@@ -38,104 +38,137 @@ export default function RoomDetail() {
 
   const weekMinutes = useCallback(async (userId) => {
     const since = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const sessions = await base44.entities.StudySession.filter(
-      { created_by_id: userId, status: "completed" },
-      "-created_date",
-      200,
-    );
-    return sessions
-      .filter((s) => new Date(s.created_date) >= since)
-      .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    try {
+      const res = await api.get("/entities/StudySession/");
+      const sessions = Array.isArray(res.data)
+        ? res.data
+        : res.data.results || [];
+      return sessions
+        .filter(
+          (s) =>
+            (s.created_by_id === userId || s.created_by === userId) &&
+            s.status === "completed" &&
+            new Date(s.created_date || s.created_at) >= since,
+        )
+        .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    } catch {
+      return 0;
+    }
   }, []);
 
   const loadParticipants = useCallback(async (roomId) => {
-    setParticipants(
-      await base44.entities.RoomParticipant.filter(
-        { room_id: roomId },
-        "-last_ping",
-        50,
-      ),
-    );
+    try {
+      const res = await api.get("/entities/RoomParticipant/");
+      const all = Array.isArray(res.data) ? res.data : res.data.results || [];
+      const roomParts = all.filter((p) => p.room_id === String(roomId));
+      setParticipants(roomParts);
+    } catch (err) {
+      console.error("Erro ao carregar participantes:", err);
+    }
   }, []);
 
   useEffect(() => {
     (async () => {
-      const found = await base44.entities.StudyRoom.filter({
-        invite_code: code,
-      });
-      if (!found.length) return setNotFound(true);
-      const r = found[0];
-      const user = await base44.auth.me();
-      setRoom(r);
-      setMe(user);
-      const existing = await base44.entities.RoomParticipant.filter({
-        room_id: r.id,
-        user_id: user.id,
-      });
-      const mins = await weekMinutes(user.id);
-      if (existing.length) {
-        await base44.entities.RoomParticipant.update(existing[0].id, {
-          last_ping: new Date().toISOString(),
-          week_minutes: mins,
-        });
-      } else {
-        await base44.entities.RoomParticipant.create({
-          room_id: r.id,
-          user_id: user.id,
-          user_name: user.full_name || user.email,
-          is_focusing: false,
-          status_text: "Entrou na sala",
-          week_minutes: mins,
-          last_ping: new Date().toISOString(),
-        });
+      try {
+        const roomsRes = await api.get("/entities/StudyRoom/");
+        const rooms = Array.isArray(roomsRes.data)
+          ? roomsRes.data
+          : roomsRes.data.results || [];
+        const found = rooms.find((r) => r.invite_code === code);
+
+        if (!found) return setNotFound(true);
+
+        const meRes = await api.get("/users/me/");
+        const user = meRes.data;
+        const r = found;
+
+        setRoom(r);
+        setMe(user);
+
+        const partsRes = await api.get("/entities/RoomParticipant/");
+        const allParts = Array.isArray(partsRes.data)
+          ? partsRes.data
+          : partsRes.data.results || [];
+        const existing = allParts.filter(
+          (p) =>
+            p.room_id === String(r.id) &&
+            (p.user_id === String(user.id) || p.created_by === user.id),
+        );
+
+        const mins = await weekMinutes(user.id);
+        const nowIso = new Date().toISOString();
+
+        if (existing.length) {
+          await api.patch(`/entities/RoomParticipant/${existing[0].id}/`, {
+            last_ping: nowIso,
+            week_minutes: mins,
+          });
+        } else {
+          await api.post("/entities/RoomParticipant/", {
+            room_id: String(r.id),
+            user_id: String(user.id),
+            user_name: user.full_name || user.email,
+            is_focusing: false,
+            status_text: "Entrou na sala",
+            week_minutes: mins,
+            last_ping: nowIso,
+          });
+        }
+        loadParticipants(r.id);
+      } catch (err) {
+        console.error("Erro ao inicializar sala:", err);
+        setNotFound(true);
       }
-      loadParticipants(r.id);
     })();
   }, [code, weekMinutes, loadParticipants]);
 
   const syncMe = useCallback(
     async (patch) => {
       if (!room || !me) return;
-      const rows = await base44.entities.RoomParticipant.filter({
-        room_id: room.id,
-        user_id: me.id,
-      });
-      if (rows.length) {
-        await base44.entities.RoomParticipant.update(rows[0].id, {
-          last_ping: new Date().toISOString(),
-          week_minutes: await weekMinutes(me.id),
-          ...patch,
-        });
+      try {
+        const partsRes = await api.get("/entities/RoomParticipant/");
+        const allParts = Array.isArray(partsRes.data)
+          ? partsRes.data
+          : partsRes.data.results || [];
+        const rows = allParts.filter(
+          (p) =>
+            p.room_id === String(room.id) &&
+            (p.user_id === String(me.id) || p.created_by === me.id),
+        );
+
+        if (rows.length) {
+          await api.patch(`/entities/RoomParticipant/${rows[0].id}/`, {
+            last_ping: new Date().toISOString(),
+            week_minutes: await weekMinutes(me.id),
+            ...patch,
+          });
+        }
+        loadParticipants(room.id);
+      } catch (err) {
+        console.error("Erro ao sincronizar status:", err);
       }
-      loadParticipants(room.id);
     },
     [room, me, weekMinutes, loadParticipants],
   );
 
   const timer = useRoomTimer({ room, me, onSessionSaved: () => syncMe({}) });
 
-  // presence + status sync
+  // Polling de presença e atualização a cada 5 segundos
   useEffect(() => {
     if (!room) return;
-    const unsub = base44.entities.RoomParticipant.subscribe(() =>
-      loadParticipants(room.id),
-    );
-    const id = setInterval(
-      () =>
-        syncMe({
-          is_focusing: timer.running && timer.phase === "focus",
-          status_text:
-            timer.running && timer.phase === "focus" ? statusText : "Em pausa",
-        }),
-      20000,
-    );
-    return () => {
-      unsub();
-      clearInterval(id);
-    };
+    const intervalId = setInterval(() => {
+      loadParticipants(room.id);
+      syncMe({
+        is_focusing: timer.running && timer.phase === "focus",
+        status_text:
+          timer.running && timer.phase === "focus" ? statusText : "Em pausa",
+      });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [room, timer.running, timer.phase, statusText, syncMe, loadParticipants]);
 
-  // focus-lost detection (tab hidden during focus)
+  // Perda de foco se trocar de aba durante sessão
   useEffect(() => {
     const onVis = () => {
       if (document.hidden && timer.running && timer.phase === "focus") {
@@ -149,11 +182,22 @@ export default function RoomDetail() {
 
   const leaveRoom = async () => {
     if (room && me) {
-      const rows = await base44.entities.RoomParticipant.filter({
-        room_id: room.id,
-        user_id: me.id,
-      });
-      if (rows.length) await base44.entities.RoomParticipant.delete(rows[0].id);
+      try {
+        const partsRes = await api.get("/entities/RoomParticipant/");
+        const allParts = Array.isArray(partsRes.data)
+          ? partsRes.data
+          : partsRes.data.results || [];
+        const rows = allParts.filter(
+          (p) =>
+            p.room_id === String(room.id) &&
+            (p.user_id === String(me.id) || p.created_by === me.id),
+        );
+        if (rows.length) {
+          await api.delete(`/entities/RoomParticipant/${rows[0].id}/`);
+        }
+      } catch (err) {
+        console.error("Erro ao sair da sala:", err);
+      }
     }
     nav("/salas");
   };
@@ -173,12 +217,14 @@ export default function RoomDetail() {
       </div>
     );
   }
-  if (!room)
+
+  if (!room) {
     return (
       <div className="px-6 py-20 text-[13px] text-muted-foreground">
         Entrando na sala...
       </div>
     );
+  }
 
   const shareLink = `${window.location.origin}/salas/${room.invite_code}`;
 

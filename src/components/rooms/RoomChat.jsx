@@ -10,18 +10,31 @@ export default function RoomChat({ roomId, userName, active = true }) {
   const endRef = useRef(null);
 
   const load = async () => {
-    const list = await base44.entities.RoomMessage.filter(
-      { room_id: roomId },
-      "created_date",
-      100,
-    );
-    setMessages(list);
+    try {
+      // Caso sua API suporte filtros na URL, você pode usar:
+      // const res = await api.get(`/entities/RoomMessage/?room_id=${roomId}`);
+      const res = await api.get("/entities/RoomMessage/");
+      const all = Array.isArray(res.data) ? res.data : res.data.results || [];
+
+      const list = all
+        .filter((m) => String(m.room_id) === String(roomId))
+        .sort((a, b) => {
+          const dateA = new Date(a.created_at || a.created_date || 0);
+          const dateB = new Date(b.created_at || b.created_date || 0);
+          return dateA - dateB;
+        });
+
+      setMessages(list);
+    } catch (err) {
+      console.error("Erro ao carregar chat:", err);
+    }
   };
 
   useEffect(() => {
     load();
-    const unsub = base44.entities.RoomMessage.subscribe(() => load());
-    return unsub;
+    // Substitui o subscribe do base44 por um polling a cada 3 segundos
+    const intervalId = setInterval(load, 3000);
+    return () => clearInterval(intervalId);
   }, [roomId]);
 
   useEffect(() => {
@@ -30,13 +43,17 @@ export default function RoomChat({ roomId, userName, active = true }) {
 
   const send = async () => {
     if (!active || !text.trim()) return;
-    await base44.entities.RoomMessage.create({
-      room_id: roomId,
-      user_name: userName,
-      text: text.trim(),
-    });
-    setText("");
-    load();
+    try {
+      await api.post("/entities/RoomMessage/", {
+        room_id: String(roomId),
+        user_name: userName || "Anônimo",
+        text: text.trim(),
+      });
+      setText("");
+      load();
+    } catch (err) {
+      console.error("Erro ao enviar mensagem:", err);
+    }
   };
 
   return (
