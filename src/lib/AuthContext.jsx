@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
     checkUserAuth();
   }, []);
 
-  // Verifica se o usuário tem token válido no localStorage ao carregar a página
+  // Verifica se o usuário tem token válido no localStorage
   const checkUserAuth = async () => {
     const token = localStorage.getItem("token");
 
@@ -29,9 +29,8 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       setAuthError(null);
 
-      // Busca os dados do usuário autenticado no Django
-      const response = await api.get("/entities/User/");
-      // Se a listagem retornar o usuário logado ou a lista, usamos a resposta
+      // Garante a rota completa para a API do Django
+      const response = await api.get("users/me/");
       const userData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
@@ -40,7 +39,6 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
     } catch (error) {
       console.error("User auth check failed:", error);
-      // Se o token estiver expirado ou inválido
       if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.removeItem("token");
         setUser(null);
@@ -56,18 +54,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Função de Login (Chama a API JWT do Django)
+  // Função de Login
   const login = async (email, password) => {
     try {
       setAuthError(null);
-      const response = await api.post("/auth/login/", { email, password });
-      const { token, user: userData } = response.data;
 
-      // Salva o JWT no localStorage
+      // Envia tanto 'username' quanto 'email' para garantir compatibilidade com o SimpleJWT
+      const response = await api.post("auth/login/", {
+        username: email,
+        email: email,
+        password: password,
+      });
+
+      const token = response.data.access || response.data.token;
+      const userData = response.data.user || null;
+
       localStorage.setItem("token", token);
-      setUser(userData);
-      setIsAuthenticated(true);
 
+      // Se a resposta de login não trouxer os dados completos do usuário, busca via /users/me/
+      if (userData) {
+        setUser(userData);
+      } else {
+        await checkUserAuth();
+      }
+
+      setIsAuthenticated(true);
       return userData;
     } catch (error) {
       const errorMsg =
@@ -92,19 +103,21 @@ export const AuthProvider = ({ children }) => {
   const register = async (fullName, email, password) => {
     try {
       setAuthError(null);
-      const response = await api.post("/auth/register/", {
+      const response = await api.post("auth/register/", {
         full_name: fullName,
         email: email,
         password: password,
       });
 
-      const { token, user: userData } = response.data;
+      const token = response.data.access || response.data.token;
+      const userData = response.data.user || null;
 
-      // Armazena o token e define o usuário logado
-      localStorage.setItem("token", token);
+      if (token) {
+        localStorage.setItem("token", token);
+        setIsAuthenticated(true);
+      }
+
       setUser(userData);
-      setIsAuthenticated(true);
-
       return userData;
     } catch (error) {
       const errorMsg =
