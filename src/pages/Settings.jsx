@@ -76,7 +76,7 @@ export default function Settings() {
   const { data: me, error } = useQuery({
     queryKey: ["user"],
     queryFn: async () => {
-      const res = await api.get("/users/me/");
+      const res = await api.get("users/me/");
       return res.data;
     },
     retry: false,
@@ -108,7 +108,7 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
-      await api.patch("/users/me/", { settings: s, avatar_url: avatar });
+      await api.patch("users/me/", { settings: s, avatar_url: avatar });
       await qc.invalidateQueries({ queryKey: ["user"] });
       toast({ title: "Configurações salvas" });
     } catch (e) {
@@ -124,7 +124,7 @@ export default function Settings() {
 
   const exportAnki = async () => {
     try {
-      const res = await api.get("/techniques/");
+      const res = await api.get("techniques/");
       const techs = Array.isArray(res.data) ? res.data : res.data.results || [];
 
       const rows = ["front\tback\ttags"];
@@ -150,7 +150,7 @@ export default function Settings() {
 
   const backup = async () => {
     try {
-      const res = await api.get("/study-sessions/");
+      const res = await api.get("study-sessions/");
       const sessions = Array.isArray(res.data)
         ? res.data
         : res.data.results || [];

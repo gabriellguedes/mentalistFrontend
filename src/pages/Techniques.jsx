@@ -13,7 +13,7 @@ export default function Techniques() {
   const { data: techniques = [], isLoading } = useQuery({
     queryKey: ["techniques"],
     queryFn: async () => {
-      const response = await api.get("/entities/Technique/");
+      const response = await api.get("entities/Technique/");
       return Array.isArray(response.data)
         ? response.data
         : response.data.results || [];

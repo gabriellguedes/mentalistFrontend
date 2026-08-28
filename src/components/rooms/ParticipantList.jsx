@@ -9,7 +9,7 @@ export default function ParticipantList({ participants = [] }) {
 
   // Mapeamento tolerante aos nomes de campos vindos da API
   const normalizedParticipants = safeParticipants.map((p) => {
-    const name = p.user_name || p.username || p.full_name || "Estudante";
+    const name = p.full_name || p.user_name || "Estudante";
     const minutes =
       p.week_minutes ?? p.total_focus_minutes ?? p.focus_minutes ?? 0;
     const isFocusing = p.is_focusing ?? p.is_active ?? false;
@@ -97,7 +97,7 @@ export default function ParticipantList({ participants = [] }) {
                   {p.display_name}
                 </td>
                 <td className="py-2 text-right tabular-nums text-muted-foreground">
-                  {Math.round(p.minutes)}m
+                  {Math.round(p.week_minutes)}m
                 </td>
               </tr>
             ))}

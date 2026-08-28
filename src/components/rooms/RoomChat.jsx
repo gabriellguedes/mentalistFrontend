@@ -13,7 +13,7 @@ export default function RoomChat({ roomId, userName, active = true }) {
     try {
       // Caso sua API suporte filtros na URL, você pode usar:
       // const res = await api.get(`/entities/RoomMessage/?room_id=${roomId}`);
-      const res = await api.get("/entities/RoomMessage/");
+      const res = await api.get("entities/RoomMessage/");
       const all = Array.isArray(res.data) ? res.data : res.data.results || [];
 
       const list = all
@@ -44,7 +44,7 @@ export default function RoomChat({ roomId, userName, active = true }) {
   const send = async () => {
     if (!active || !text.trim()) return;
     try {
-      await api.post("/entities/RoomMessage/", {
+      await api.post("entities/RoomMessage/", {
         room_id: String(roomId),
         user_name: userName || "Anônimo",
         text: text.trim(),

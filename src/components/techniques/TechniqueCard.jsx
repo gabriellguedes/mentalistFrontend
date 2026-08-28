@@ -6,7 +6,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import CopyButton from "@/components/CopyButton";
 import { ChevronRight } from "lucide-react";
 

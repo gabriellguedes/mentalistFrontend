@@ -75,7 +75,7 @@ export default function useStudyTimer({
 
       try {
         // Registra a nova sessão de estudo
-        await api.post("/entities/StudySession/", {
+        await api.post("entities/StudySession/", {
           timer_type: modeId,
           duration_minutes: mins,
           status,
@@ -84,10 +84,10 @@ export default function useStudyTimer({
         });
 
         // Busca o perfil do usuário logado e atualiza total_focus_minutes
-        const meRes = await api.get("/users/me/");
+        const meRes = await api.get("users/me/");
         const currentTotal = meRes.data.total_focus_minutes || 0;
 
-        await api.patch("/users/me/", {
+        await api.patch("users/me/", {
           total_focus_minutes: currentTotal + mins,
         });
 

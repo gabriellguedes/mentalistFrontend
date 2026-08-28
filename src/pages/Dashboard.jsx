@@ -31,10 +31,10 @@ export default function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const meRes = await api.get("/users/me/");
+      const meRes = await api.get("users/me/");
       const me = meRes.data;
 
-      const sessionsRes = await api.get("/entities/StudySession/");
+      const sessionsRes = await api.get("entities/StudySession/");
       const rawSessions = Array.isArray(sessionsRes.data)
         ? sessionsRes.data
         : sessionsRes.data.results || [];
@@ -102,6 +102,7 @@ export default function Dashboard() {
         <Stat
           label="Média/sessão"
           value={`${completed.length ? Math.round(completed.reduce((s, x) => s + x.duration_minutes, 0) / completed.length) : 0}m`}
+          hint="Média simples"
         />
       </div>
 

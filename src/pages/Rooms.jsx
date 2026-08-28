@@ -18,7 +18,7 @@ export default function Rooms() {
   const { data: rooms = [], refetch } = useQuery({
     queryKey: ["rooms"],
     queryFn: async () => {
-      const res = await api.get("/entities/StudyRoom/");
+      const res = await api.get("entities/StudyRoom/");
       return Array.isArray(res.data) ? res.data : res.data.results || [];
     },
   });
@@ -26,15 +26,15 @@ export default function Rooms() {
   const create = async () => {
     if (!name.trim()) return;
     try {
-      const meRes = await api.get("/users/me/");
-      const roomRes = await api.post("/entities/StudyRoom/", {
+      const meRes = await api.get("users/me/");
+      const roomRes = await api.post("entities/StudyRoom/", {
         name: name.trim(),
         invite_code: code(),
         host_user_id: meRes.data.id.toString(),
       });
       setName("");
       refetch();
-      nav(`/salas/${roomRes.data.invite_code}`);
+      nav(`salas/${roomRes.data.invite_code}`);
     } catch (err) {
       console.error("Erro ao criar sala:", err);
     }
@@ -46,7 +46,7 @@ export default function Rooms() {
     if (!searchCode) return;
 
     try {
-      const res = await api.get("/entities/StudyRoom/");
+      const res = await api.get("entities/StudyRoom/");
       const allRooms = Array.isArray(res.data)
         ? res.data
         : res.data.results || [];

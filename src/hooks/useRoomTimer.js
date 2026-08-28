@@ -16,7 +16,8 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     me &&
     room &&
     (String(me.id) === String(room.host_user_id) ||
-      String(me.id) === String(room.created_by))
+      String(me.id) === String(room.created_by) ||
+      String(me.id) === String(room.created_by_id))
   );
   const [modeId, setModeId] = useState("pomodoro");
   const [phase, setPhase] = useState("focus");
@@ -43,7 +44,7 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
 
         // Atualiza o total de minutos acumulados do usuário
         const currentTotal = me?.total_focus_minutes || 0;
-        await api.patch("/users/me/", {
+        await api.patch("users/me/", {
           total_focus_minutes: currentTotal + mins,
         });
 
@@ -103,10 +104,14 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     if (!isHost || !room) return;
     const broadcast = async () => {
       const s = stateRef.current;
-      const state = { ...s, hostId: me?.id, ts: Date.now() };
+      const state = {
+        ...s,
+        hostId: me?.id ? String(me.id) : null,
+        ts: Date.now(),
+      };
       if (s.running) state.endsAt = Date.now() + s.secondsLeft * 1000;
       try {
-        await api.patch(`/entities/StudyRoom/${room.id}/`, {
+        await api.patch(`entities/StudyRoom/${room.id}/`, {
           current_timer_status: JSON.stringify(state),
         });
       } catch (err) {
@@ -125,7 +130,7 @@ export default function useRoomTimer({ room, me, onSessionSaved }) {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await api.get(`/entities/StudyRoom/${room.id}/`);
+        const res = await api.get(`entities/StudyRoom/${room.id}/`);
         const r = res.data;
         if (cancelled) return;
         let st = null;

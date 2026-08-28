@@ -8,10 +8,10 @@ export default function Profile() {
   const { data } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
-      const meRes = await api.get("/users/me/");
+      const meRes = await api.get("users/me/");
       const me = meRes.data;
 
-      const sessionsRes = await api.get("/entities/StudySession/");
+      const sessionsRes = await api.get("entities/StudySession/");
       const rawSessions = Array.isArray(sessionsRes.data)
         ? sessionsRes.data
         : sessionsRes.data.results || [];

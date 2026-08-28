@@ -39,7 +39,7 @@ export default function RoomDetail() {
   const weekMinutes = useCallback(async (userId) => {
     const since = startOfWeek(new Date(), { weekStartsOn: 1 });
     try {
-      const res = await api.get("/entities/StudySession/");
+      const res = await api.get("entities/StudySession/");
       const sessions = Array.isArray(res.data)
         ? res.data
         : res.data.results || [];
@@ -58,7 +58,7 @@ export default function RoomDetail() {
 
   const loadParticipants = useCallback(async (roomId) => {
     try {
-      const res = await api.get("/entities/RoomParticipant/");
+      const res = await api.get("entities/RoomParticipant/");
       const all = Array.isArray(res.data) ? res.data : res.data.results || [];
       const roomParts = all.filter((p) => p.room_id === String(roomId));
       setParticipants(roomParts);
@@ -70,7 +70,7 @@ export default function RoomDetail() {
   useEffect(() => {
     (async () => {
       try {
-        const roomsRes = await api.get("/entities/StudyRoom/");
+        const roomsRes = await api.get("entities/StudyRoom/");
         const rooms = Array.isArray(roomsRes.data)
           ? roomsRes.data
           : roomsRes.data.results || [];
@@ -78,14 +78,14 @@ export default function RoomDetail() {
 
         if (!found) return setNotFound(true);
 
-        const meRes = await api.get("/users/me/");
+        const meRes = await api.get("users/me/");
         const user = meRes.data;
         const r = found;
 
         setRoom(r);
         setMe(user);
 
-        const partsRes = await api.get("/entities/RoomParticipant/");
+        const partsRes = await api.get("entities/RoomParticipant/");
         const allParts = Array.isArray(partsRes.data)
           ? partsRes.data
           : partsRes.data.results || [];
@@ -99,15 +99,15 @@ export default function RoomDetail() {
         const nowIso = new Date().toISOString();
 
         if (existing.length) {
-          await api.patch(`/entities/RoomParticipant/${existing[0].id}/`, {
+          await api.patch(`entities/RoomParticipant/${existing[0].id}/`, {
             last_ping: nowIso,
             week_minutes: mins,
           });
         } else {
-          await api.post("/entities/RoomParticipant/", {
+          await api.post("entities/RoomParticipant/", {
             room_id: String(r.id),
             user_id: String(user.id),
-            user_name: user.full_name || user.email,
+            user_name: user.full_name || user.username || user.email,
             is_focusing: false,
             status_text: "Entrou na sala",
             week_minutes: mins,
@@ -126,7 +126,7 @@ export default function RoomDetail() {
     async (patch) => {
       if (!room || !me) return;
       try {
-        const partsRes = await api.get("/entities/RoomParticipant/");
+        const partsRes = await api.get("entities/RoomParticipant/");
         const allParts = Array.isArray(partsRes.data)
           ? partsRes.data
           : partsRes.data.results || [];
@@ -137,7 +137,7 @@ export default function RoomDetail() {
         );
 
         if (rows.length) {
-          await api.patch(`/entities/RoomParticipant/${rows[0].id}/`, {
+          await api.patch(`entities/RoomParticipant/${rows[0].id}/`, {
             last_ping: new Date().toISOString(),
             week_minutes: await weekMinutes(me.id),
             ...patch,
@@ -183,7 +183,7 @@ export default function RoomDetail() {
   const leaveRoom = async () => {
     if (room && me) {
       try {
-        const partsRes = await api.get("/entities/RoomParticipant/");
+        const partsRes = await api.get("entities/RoomParticipant/");
         const allParts = Array.isArray(partsRes.data)
           ? partsRes.data
           : partsRes.data.results || [];
@@ -193,7 +193,7 @@ export default function RoomDetail() {
             (p.user_id === String(me.id) || p.created_by === me.id),
         );
         if (rows.length) {
-          await api.delete(`/entities/RoomParticipant/${rows[0].id}/`);
+          await api.delete(`entities/RoomParticipant/${rows[0].id}/`);
         }
       } catch (err) {
         console.error("Erro ao sair da sala:", err);

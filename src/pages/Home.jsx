@@ -35,10 +35,10 @@ export default function Home() {
   const { data: profile } = useQuery({
     queryKey: ["home-profile"],
     queryFn: async () => {
-      const meRes = await api.get("/users/me/");
+      const meRes = await api.get("users/me/");
       const me = meRes.data;
 
-      const sessionsRes = await api.get("/entities/StudySession/");
+      const sessionsRes = await api.get("entities/StudySession/");
       const allSessions = Array.isArray(sessionsRes.data)
         ? sessionsRes.data
         : sessionsRes.data.results || [];
@@ -58,7 +58,7 @@ export default function Home() {
   const { data: techniques = [] } = useQuery({
     queryKey: ["techniques"],
     queryFn: async () => {
-      const res = await api.get("/entities/Technique/");
+      const res = await api.get("entities/Technique/");
       return Array.isArray(res.data) ? res.data : res.data.results || [];
     },
   });
@@ -66,7 +66,7 @@ export default function Home() {
   const { data: focusing = [] } = useQuery({
     queryKey: ["home-focusing"],
     queryFn: async () => {
-      const res = await api.get("/entities/RoomParticipant/");
+      const res = await api.get("entities/RoomParticipant/");
       const all = Array.isArray(res.data) ? res.data : res.data.results || [];
       return all.filter((p) => p.is_focusing);
     },
