@@ -194,11 +194,19 @@ export default function Home() {
               return (
                 <div key={p.id} className="flex flex-col items-center gap-1">
                   <div className="relative">
-                    <Avatar className="h-9 w-9 rounded-full border border-border">
-                      <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
-                        {initials(name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {p.avatar_url ? (
+                      <img
+                        src={p.avatar_url}
+                        alt="Avatar"
+                        className="h-24 w-24 rounded-full object-cover border border-border"
+                      />
+                    ) : (
+                      <Avatar className="h-9 w-9 rounded-full border border-border">
+                        <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
+                          {initials(name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                     <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-card bg-emerald" />
                   </div>
                   <p className="max-w-[64px] truncate text-[10px] text-muted-foreground">

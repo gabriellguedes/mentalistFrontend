@@ -54,7 +54,7 @@ export default function Techniques() {
             className="h-9 rounded-md border-border bg-card pl-8 text-[13px]"
           />
         </div>
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <div className="mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           {categories.map((c) => {
             const active = cat === c;
             return (

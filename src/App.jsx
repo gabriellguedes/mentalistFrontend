@@ -76,6 +76,7 @@ const AuthenticatedApp = () => {
           <Route path="/salas" element={<Rooms />} />
           <Route path="/salas/:code" element={<RoomDetail />} />
           <Route path="/perfil" element={<Profile />} />
+          <Route path="/perfil/:username" element={<Profile />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/configuracoes" element={<Settings />} />
         </Route>

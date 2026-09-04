@@ -100,11 +100,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Função de Registro
-  const register = async (fullName, email, password) => {
+  const register = async (fullName, username, email, password) => {
     try {
       setAuthError(null);
       const response = await api.post("auth/register/", {
         full_name: fullName,
+        username: username,
         email: email,
         password: password,
       });
@@ -132,6 +133,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Função para autenticação via Token (Google OAuth / SSO)
+  const loginWithToken = async (accessToken, refreshToken) => {
+    try {
+      setAuthError(null);
+      if (accessToken) {
+        localStorage.setItem("token", accessToken);
+      }
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
+      }
+      await checkUserAuth();
+      setIsAuthenticated(true);
+    } catch (error) {
+      setAuthError({
+        type: "auth_required",
+        message: "Falha ao validar sessão via token.",
+      });
+      throw error;
+    }
+  };
+
+  // Não se esqueça de expor `loginWithToken` no Provider:
   return (
     <AuthContext.Provider
       value={{
@@ -141,6 +164,7 @@ export const AuthProvider = ({ children }) => {
         authError,
         authChecked,
         login,
+        loginWithToken, // <-- ADICIONADO AQUI
         register,
         logout,
         checkUserAuth,

@@ -16,7 +16,12 @@
     "resolveJsonModule": true,
     "types": []
   },
-  "include": ["src/components/**/*.js", "src/pages/**/*.jsx", "src/Layout.jsx"],
+  "include": [
+    "src/components/**/*.js",
+    "src/pages/**/*.jsx",
+    "src/Layout.jsx",
+    "src/pages/Profile.jsx.old"
+  ],
   "exclude": [
     "node_modules",
     "dist",
