@@ -1,23 +1,31 @@
 import React, { useState, useEffect } from "react";
 import api from "@/api/mentalistClient";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import PageHeader from "@/components/PageHeader";
 import Insignias from "@/pages/profile/Insignias";
+import Statistics from "@/pages/profile/Statistics";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Camera,
   UserPlus,
   UserCheck,
+  UserX,
+  Clock,
   Trash2,
+  BarChart3,
+  Trophy,
   Loader2,
   Save,
-  User,
   Settings,
   Activity,
   Award,
+  Users,
+  Check,
+  X,
 } from "lucide-react";
 
 const initials = (name) => (name || "?").trim().slice(0, 2).toUpperCase();
@@ -29,7 +37,7 @@ export default function Profile() {
 
   const isOwnProfile = !username || username === currentUser?.username;
 
-  const [activeTab, setActiveTab] = useState("visao-geral"); // Controle da aba ativa
+  const [activeTab, setActiveTab] = useState("visao-geral");
   const [profileData, setProfileData] = useState(null);
   const [fullName, setFullName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -37,13 +45,26 @@ export default function Profile() {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
+  // Estados de Amizade
+  const [friendshipStatus, setFriendshipStatus] = useState("none"); // none, pending_sent, pending_received, accepted
+  const [friendshipId, setFriendshipId] = useState(null);
+  const [friendsList, setFriendsList] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isFriend, setIsFriend] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
   }, [username]);
+
+  // Executa o fetchFriends após o perfil carregar (ou mudar de usuário)
+  useEffect(() => {
+    if (profileData) {
+      fetchFriends();
+    }
+  }, [profileData?.id, username]);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -59,6 +80,10 @@ export default function Profile() {
       setCpf(data.cpf || "");
       setBirthDate(data.birth_date || "");
       setAvatarPreview(data.avatar_url || data.avatar || null);
+
+      if (!isOwnProfile) {
+        checkFriendshipStatus(data.id);
+      }
     } catch (err) {
       console.error("Erro ao carregar perfil:", err);
       if (err.response?.status === 404) {
@@ -67,6 +92,102 @@ export default function Profile() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFriends = async () => {
+    try {
+      // 1. Define qual ID de usuário devemos buscar os amigos:
+      // Se for o próprio perfil, podemos omitir o ID (ou usar profileData?.id).
+      // Se for outro perfil, passamos o ID do usuário que veio do fetchProfile.
+      const targetId = isOwnProfile
+        ? ""
+        : profileData?.id
+          ? `${profileData.id}/`
+          : "";
+
+      // 2. Faz as chamadas em paralelo
+      const [friendsRes, requestsRes] = await Promise.all([
+        api.get(`friendship/friends/${targetId}`),
+        isOwnProfile
+          ? api.get("friendship/requests/pending/")
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      setFriendsList(friendsRes.data || []);
+      setPendingRequests(requestsRes.data || []);
+    } catch (err) {
+      console.error("Erro ao carregar lista de amigos:", err);
+    }
+  };
+
+  const checkFriendshipStatus = async (targetUserId) => {
+    try {
+      const res = await api.get(`friendship/status/${targetUserId}/`);
+      setFriendshipStatus(res.data.status); // backend retorna: 'none', 'pending_sent', 'pending_received', ou 'accepted'
+      setFriendshipId(res.data.friendship_id || null);
+    } catch (err) {
+      console.error("Erro ao verificar status de amizade:", err);
+    }
+  };
+
+  // Funções de Ação de Amizade
+  const handleSendRequest = async () => {
+    setActionLoading(true);
+    try {
+      const res = await api.post("friendship/requests/send/", {
+        target_user_id: profileData.id,
+      });
+      setFriendshipStatus("pending_sent");
+      setFriendshipId(res.data.id);
+    } catch (err) {
+      alert(err.response?.data?.detail || "Erro ao enviar solicitação.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async (id = friendshipId) => {
+    setActionLoading(true);
+    try {
+      await api.post(`friendship/requests/${id}/accept/`);
+      setFriendshipStatus("accepted");
+      fetchFriends();
+    } catch (err) {
+      alert("Erro ao aceitar solicitação.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectOrCancelRequest = async (id = friendshipId) => {
+    setActionLoading(true);
+    try {
+      await api.post(`friendship/requests/${id}/reject/`);
+      setFriendshipStatus("none");
+      fetchFriends();
+    } catch (err) {
+      alert("Erro ao processar solicitação.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    const confirm = window.confirm(
+      `Deseja remover @${profileData.username} dos seus amigos?`,
+    );
+    if (!confirm) return;
+
+    setActionLoading(true);
+    try {
+      await api.delete(`friendship/friends/${profileData.id}/remove/`);
+      setFriendshipStatus("none");
+      fetchFriends();
+    } catch (err) {
+      alert("Erro ao remover amigo.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -81,39 +202,21 @@ export default function Profile() {
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaving(true);
-
     const formData = new FormData();
     formData.append("full_name", fullName);
     formData.append("cpf", cpf);
     formData.append("birth_date", birthDate);
-    if (selectedFile) {
-      formData.append("avatar", selectedFile);
-    }
+    if (selectedFile) formData.append("avatar", selectedFile);
 
     try {
-      const res = await api.patch("entities/User/update-profile/", formData, {
+      await api.patch("entities/User/update-profile/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert("Perfil atualizado com sucesso!");
     } catch (err) {
-      alert("Erro ao atualizar o perfil.");
+      alert("Erro ao atualizar perfil.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDeactivateAccount = async () => {
-    const confirm = window.confirm(
-      "Tem certeza de que deseja desativar sua conta? Esta ação não poderá ser desfeita.",
-    );
-    if (!confirm) return;
-
-    try {
-      await api.post("entities/User/deactivate-account/");
-      logout();
-      navigate("/login");
-    } catch (err) {
-      alert("Erro ao desativar conta.");
     }
   };
 
@@ -125,9 +228,9 @@ export default function Profile() {
     );
   }
 
-  // Abas disponíveis
   const tabs = [
     { id: "visao-geral", label: "Visão Geral", icon: Activity },
+    { id: "amigos", label: "Amigos", icon: Users },
     { id: "conquistas", label: "Conquistas", icon: Award },
     ...(isOwnProfile
       ? [{ id: "configuracoes", label: "Configurações", icon: Settings }]
@@ -181,26 +284,57 @@ export default function Profile() {
             </p>
           </div>
 
+          {/* Botão Dinâmico de Amizade */}
           {!isOwnProfile && (
-            <Button
-              onClick={() => setIsFriend(!isFriend)}
-              variant={isFriend ? "outline" : "default"}
-            >
-              {isFriend ? (
-                <>
-                  <UserCheck className="mr-2 h-4 w-4" /> Amigos
-                </>
-              ) : (
-                <>
+            <div>
+              {actionLoading ? (
+                <Button disabled size="sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </Button>
+              ) : friendshipStatus === "none" ? (
+                <Button onClick={handleSendRequest} size="sm">
                   <UserPlus className="mr-2 h-4 w-4" /> Adicionar Amigo
-                </>
+                </Button>
+              ) : friendshipStatus === "pending_sent" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRejectOrCancelRequest()}
+                >
+                  <Clock className="mr-2 h-4 w-4" /> Cancelar Solicitação
+                </Button>
+              ) : friendshipStatus === "pending_received" ? (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-emerald text-white hover:bg-emerald/90"
+                    onClick={() => handleAcceptRequest()}
+                  >
+                    <Check className="mr-1 h-4 w-4" /> Aceitar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRejectOrCancelRequest()}
+                  >
+                    <X className="mr-1 h-4 w-4" /> Recusar
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleRemoveFriend}
+                >
+                  <UserX className="mr-2 h-4 w-4" /> Desfaire Amizade
+                </Button>
               )}
-            </Button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Navegação Estilo Abas do Navegador Chrome */}
+      {/* Navegação por Abas */}
       <div className="flex items-center gap-1 border-b border-border bg-muted/30 p-1.5 rounded-t-xl overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -217,6 +351,13 @@ export default function Profile() {
             >
               <Icon className="h-3.5 w-3.5" />
               <span>{tab.label}</span>
+              {tab.id === "amigos" &&
+                isOwnProfile &&
+                pendingRequests.length > 0 && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold">
+                    {pendingRequests.length}
+                  </span>
+                )}
             </button>
           );
         })}
@@ -227,24 +368,118 @@ export default function Profile() {
         {/* ABA: Visão Geral */}
         {activeTab === "visao-geral" && (
           <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-foreground">
-              Estatísticas e Foco
-            </h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-border bg-muted/20 p-4">
-                <p className="text-xs text-muted-foreground">
-                  Tempo Total de Hiperfoco
-                </p>
-                <p className="mt-1 text-2xl font-bold text-emerald">
-                  {profileData?.total_focus_minutes || 0} min
-                </p>
+            <PageHeader
+              eyebrow=""
+              icon={BarChart3}
+              title="Estatísticas"
+              subtitle="Métricas de foco, consistência e evolução."
+            />
+            <Statistics />
+          </div>
+        )}
+
+        {/* ABA: Amigos */}
+        {activeTab === "amigos" && (
+          <div className="space-y-6">
+            {/* Solicitações Pendentes (visível apenas no próprio perfil) */}
+            {isOwnProfile && pendingRequests.length > 0 && (
+              <div>
+                <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                  Solicitações Pendentes ({pendingRequests.length})
+                </h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {pendingRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="flex items-center justify-between rounded-lg border border-border p-3 bg-card"
+                    >
+                      <Link
+                        to={`/perfil/${req.sender_username}`}
+                        className="flex items-center gap-3"
+                      >
+                        <Avatar className="h-8 w-8 rounded-full border border-border">
+                          <AvatarFallback className="text-xs">
+                            {initials(req.sender_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-xs font-medium text-foreground">
+                            {req.sender_name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            @{req.sender_username}
+                          </p>
+                        </div>
+                      </Link>
+                      <div className="flex gap-1.5">
+                        <Button
+                          size="icon"
+                          className="h-7 w-7 bg-emerald text-white"
+                          onClick={() => handleAcceptRequest(req.id)}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => handleRejectOrCancelRequest(req.id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="rounded-lg border border-border bg-muted/20 p-4">
-                <p className="text-xs text-muted-foreground">
-                  Sessões Concluídas
+            )}
+
+            {/* Lista de Amigos */}
+            <div>
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                Amigos ({friendsList.length})
+              </h3>
+
+              {friendsList.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4">
+                  Nenhum amigo adicionado ainda.
                 </p>
-                <p className="mt-1 text-2xl font-bold text-foreground">12</p>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {friendsList.map((friend) => (
+                    <Link
+                      key={friend.id}
+                      to={`/perfil/${friend.username}`}
+                      className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/20 hover:shadow-sm"
+                    >
+                      <div className="relative">
+                        {friend.avatar_url ? (
+                          <img
+                            src={friend.avatar_url}
+                            alt={friend.username}
+                            referrerPolicy="no-referrer"
+                            className="h-12 w-12 rounded-full object-cover border border-border"
+                          />
+                        ) : (
+                          <Avatar className="h-12 w-12 rounded-full border border-border">
+                            <AvatarFallback className="rounded-full bg-secondary text-xs text-foreground font-medium">
+                              {initials(friend.full_name || friend.username)}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                      <div className="text-center w-full">
+                        <p className="truncate text-xs font-medium text-foreground group-hover:text-primary">
+                          {friend.full_name || friend.username}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          @{friend.username}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -252,64 +487,34 @@ export default function Profile() {
         {/* ABA: Conquistas */}
         {activeTab === "conquistas" && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Nível e Medalhas
-            </h2>
+            <PageHeader
+              eyebrow=""
+              icon={Trophy}
+              title="Nível e Medalhas"
+              subtitle="Seu nível evolui conforme o tempo de foco é acumulado."
+            />
             <div className="grid gap-4">
               <>
                 <Insignias />
               </>
-              {/*<div className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center">
-                <Award className="h-8 w-8 text-amber-500" />
-                <span className="text-xs font-medium">Primeiro Hiperfoco</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center opacity-50">
-                <Award className="h-8 w-8 text-muted-foreground" />
-                <span className="text-xs font-medium">10 Horas de Foco</span>
-              </div>*/}
             </div>
           </div>
         )}
 
-        {/* ABA: Configurações (Apenas no próprio perfil) */}
+        {/* ABA: Configurações */}
         {activeTab === "configuracoes" && isOwnProfile && (
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <h2 className="text-lg font-semibold text-foreground">
               Dados Pessoais
             </h2>
-
             <div className="space-y-1.5">
               <Label htmlFor="fullName">Nome Completo</Label>
               <Input
                 id="fullName"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Seu nome completo"
               />
             </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
-                  placeholder="000.000.000-00"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="birthDate">Data de Nascimento</Label>
-                <Input
-                  id="birthDate"
-                  type="date"
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                />
-              </div>
-            </div>
-
             <div className="flex justify-end pt-2">
               <Button type="submit" disabled={saving}>
                 {saving ? (
@@ -318,24 +523,6 @@ export default function Profile() {
                   <Save className="mr-2 h-4 w-4" />
                 )}
                 Salvar Alterações
-              </Button>
-            </div>
-
-            <div className="mt-10 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-              <h3 className="text-sm font-semibold text-destructive">
-                Zona de Perigo
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ao desativar sua conta, seus dados não estarão mais visíveis.
-              </p>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="mt-3"
-                onClick={handleDeactivateAccount}
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Desativar Minha Conta
               </Button>
             </div>
           </form>

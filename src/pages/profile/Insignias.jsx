@@ -1,7 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/mentalistClient";
-import PageHeader from "@/components/PageHeader";
 import { getLevel, LEVELS, BADGES, computeBadges } from "@/lib/levels";
 
 export default function Profile() {
@@ -29,13 +28,7 @@ export default function Profile() {
   const earned = computeBadges(data?.sessions || [], total);
 
   return (
-    <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8 sm:py-14">
-      <PageHeader
-        eyebrow=""
-        title=""
-        subtitle="Seu nível evolui conforme o tempo de foco acumulado."
-      />
-
+    <div>
       <div className="rounded-lg border border-border bg-card p-5">
         <div className="flex items-baseline justify-between">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">

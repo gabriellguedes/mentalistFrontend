@@ -23,7 +23,6 @@ const NAV = [
   { to: "/prompts", label: "IAs", icon: Bot },
   { to: "/salas", label: "Salas", icon: Users },
   { to: "/perfil", label: "Perfil", icon: Trophy },
-  { to: "/dashboard", label: "Dados", icon: BarChart3 },
   { to: "/configuracoes", label: "Configurações", icon: SettingsIcon },
 ];
 

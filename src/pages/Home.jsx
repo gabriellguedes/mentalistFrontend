@@ -6,6 +6,7 @@ import { getLevel } from "@/lib/levels";
 import { startOfWeek } from "date-fns";
 import { Timer, Library, Bot, Users, ArrowRight, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import NotificationBell from "@/components/NotificationBell";
 
 const initials = (name) => (name || "?").trim().slice(0, 2).toUpperCase();
 
@@ -104,16 +105,24 @@ export default function Home() {
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
       {/* Topo */}
       <div className="mb-8">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Início
-        </p>
-        <h1 className="mt-2 text-2xl font-medium tracking-tight">
-          Olá, {firstName}
-        </h1>
-        <p className="mt-1.5 text-[13px] text-muted-foreground">
-          Nível {lvl.level} · {lvl.name} <span className="text-dim">·</span>{" "}
-          {(weekMin / 60).toFixed(1)}h estudadas esta semana
-        </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Início
+            </p>
+            <h1 className="mt-2 text-2xl font-medium tracking-tight">
+              Olá, {firstName}
+            </h1>
+            <p className="mt-1.5 text-[13px] text-muted-foreground">
+              Nível {lvl.level} · {lvl.name} <span className="text-dim">·</span>{" "}
+              {(weekMin / 60).toFixed(1)}h estudadas esta semana
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+          </div>
+        </div>
       </div>
 
       {/* Bloco principal */}
@@ -190,25 +199,38 @@ export default function Home() {
               </p>
             )}
             {focusing.slice(0, 8).map((p) => {
-              const name = p.user_name || p.username || "—";
+              // Pega o nome do participante (com fallbacks)
+              const name =
+                p.user_name || p.username || p.user?.full_name || "—";
+              // Pega o username para a URL (com fallbacks)
+              const username =
+                p.username || p.user_username || p.user?.username;
+              // Pega a foto de perfil (com fallbacks)
+              const avatarUrl =
+                p.avatar_url || p.user_avatar || p.user?.avatar_url;
+
               return (
                 <div key={p.id} className="flex flex-col items-center gap-1">
-                  <div className="relative">
-                    {p.avatar_url ? (
-                      <img
-                        src={p.avatar_url}
-                        alt="Avatar"
-                        className="h-24 w-24 rounded-full object-cover border border-border"
-                      />
-                    ) : (
-                      <Avatar className="h-9 w-9 rounded-full border border-border">
-                        <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
-                          {initials(name)}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-card bg-emerald" />
-                  </div>
+                  {/* Se existir username, envolve com Link para o perfil */}
+                  <Link to={username ? `/perfil/${username}` : "/perfil"}>
+                    <div className="relative">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={name}
+                          referrerPolicy="no-referrer" /* Evita erro de ORB/Google */
+                          className="h-9 w-9 rounded-full object-cover border border-border" /* Mantém o mesmo tamanho do AvatarFallback */
+                        />
+                      ) : (
+                        <Avatar className="h-9 w-9 rounded-full border border-border">
+                          <AvatarFallback className="rounded-full bg-secondary text-[10px] text-muted-foreground">
+                            {initials(name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-card bg-emerald" />
+                    </div>
+                  </Link>
                   <p className="max-w-[64px] truncate text-[10px] text-muted-foreground">
                     {name.split(" ")[0]}
                   </p>
